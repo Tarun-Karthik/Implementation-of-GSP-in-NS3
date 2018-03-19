@@ -66,18 +66,67 @@ namespace ns3{
     NS_LOG_FUNCTION (this);
   }
 
+
+//******************************************************************************
+//                        GSP BASIC
+//******************************************************************************
   bool
   GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
   {
     NS_LOG_FUNCTION (this << item);
     //Enqueue function goes here
+    if(GetCurrentSize () + item > GetThreshold () && Simulator::Now () > GetTimeout ())
+    {
+      NS_LOG_LOGIC("Queue Size is greater than Threshold");
+      DropBeforeEnqueue (item, FORCED_DROP);
+      SetTimeout(Simulator::Now () + GetInterval ());
+      return false;
+    }
+    else
+    {
+      bool retval = GetInternalQueue (0)->Enqueue (item);
+
+
+      NS_LOG_LOGIC ("Number packets " << GetInternalQueue (0)->GetNPackets ());
+      NS_LOG_LOGIC ("Number bytes " << GetInternalQueue (0)->GetNBytes ());
+
+      return retval;
+    }
 
   }
+//******************************************************************************
+//******************************************************************************
+
+
+//******************************************************************************
+//                            Adaptive Gsp
+//******************************************************************************
+bool
+GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
+{
+  NS_LOG_FUNCTION (this << item);
+
+}
+
+
+
+
+//******************************************************************************
+//******************************************************************************
 
   Ptr<QueueDiscItem>
   GspQueueDisc::DoDequeue (void)
   {
     NS_LOG_FUNCTION (this);
+    Ptr<QueueDiscItem> item = GetInternalQueue (0)->Dequeue ();
+
+    if (!item)
+      {
+        NS_LOG_LOGIC ("Queue empty");
+        return 0;
+      }
+
+    return item;
   }
 
   Ptr<const QueueDiscItem>
