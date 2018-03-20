@@ -50,6 +50,14 @@ namespace ns3{
                     MakeTimeAccessor (&GspQueueDisc::SetTimeout,
                                       &GspQueueDisc::GetTimeout),
                     MakeTimeChecker ())
+      .AddAttribute("State",
+                    "Determines the state of the Queue",
+                    EnumValue (QUEUE_STATE),
+                    MakeEnumAccessor (&GspQueueDisc::SetState,
+                                      &GspQueueDisc::GetState),
+                    MakeEnumChecker (QUEUE_CLEAR,"QUEUE_CLEAR".
+                                     QUEUE_OVERFLOW,"QUEUE_OVERFLOW",
+                                     QUEUE_DRAIN,"QUEUE_DRAIN"))
 
     ;
     return tid;
@@ -75,7 +83,7 @@ namespace ns3{
   {
     NS_LOG_FUNCTION (this << item);
     //Enqueue function goes here
-    if(GetCurrentSize () + item > GetThreshold () && Simulator::Now () > GetTimeout ())
+    if(GetCurrentSize () + item->GetSize () > GetThreshold () && Simulator::Now () > GetTimeout ())
     {
       NS_LOG_LOGIC("Queue Size is greater than Threshold");
       DropBeforeEnqueue (item, FORCED_DROP);
@@ -106,6 +114,20 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 {
   NS_LOG_FUNCTION (this << item);
 
+  if(GetCurrentSize () + item->GetSize () > GetMaxSize ())
+  {
+    SetState (QUEUE_OVERFLOW);
+  }
+  else if( GetState () == QUEUE_OVERFLOW && GetCurrentSize () == 0)
+  {
+    SetState (QUEUE_DRAIN);
+  }
+  else if ( GetState () == QUEUE_DRAIN && GetCurrentSize () > GetThreshold ())
+  {
+    SetState (QUEUE_CLEAR);
+  }
+
+  
 }
 
 
