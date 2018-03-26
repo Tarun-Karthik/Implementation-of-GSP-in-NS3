@@ -138,9 +138,30 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 
   cumTime=min(maxTime, max(0, cumTime));
 
-  Time presetInterval = Seconds(200);
+  Time presetInterval = Seconds(0.2);
   SetInterval( presetInterval / ( 1 + cumTime/adapt()));
-  
+
+  // After adapting the interval perform actions as in Basic GSP
+
+
+  //Basic GSP
+  if(GetCurrentSize () + item->GetSize () > GetThreshold () && Simulator::Now () > GetTimeout ())
+    {
+      NS_LOG_LOGIC("Queue Size is greater than Threshold");
+      DropBeforeEnqueue (item, FORCED_DROP);
+      SetTimeout(Simulator::Now () + GetInterval ());
+      return false;
+    }
+    else
+    {
+      bool retval = GetInternalQueue (0)->Enqueue (item);
+
+
+      NS_LOG_LOGIC ("Number packets " << GetInternalQueue (0)->GetNPackets ());
+      NS_LOG_LOGIC ("Number bytes " << GetInternalQueue (0)->GetNBytes ());
+
+      return retval;
+    }
 }
 
 
