@@ -66,7 +66,7 @@ namespace ns3{
       .AddAttribute("StartTime",
                  "current time",
                   TimeValue (Seconds(0)),
-		              MakeTimeAccessor (&GspQueueDisc::StartTime,),
+		  MakeTimeAccessor (&GspQueueDisc::StartTime),
                   MakeTimeChecker ())
     ;
     return tid;
