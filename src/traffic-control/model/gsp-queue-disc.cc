@@ -58,7 +58,16 @@ namespace ns3{
                     MakeEnumChecker (QUEUE_CLEAR,"QUEUE_CLEAR".
                                      QUEUE_OVERFLOW,"QUEUE_OVERFLOW",
                                      QUEUE_DRAIN,"QUEUE_DRAIN"))
-
+      .AddAttribute ("TimeInQueue",
+                 "The amount of time taken by the packet in the queue",
+                  StringValue (),
+                  MakeTimeAccessor (&GspQueueDisc::m_tiq),
+                  MakeTimeChecker ()) 
+      .AddAttribute("StartTime",
+                 "current time",
+                  TimeValue (Seconds(0)),
+		              MakeTimeAccessor (&GspQueueDisc::StartTime,),
+                  MakeTimeChecker ())
     ;
     return tid;
   }
@@ -169,7 +178,41 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 
 //******************************************************************************
 //******************************************************************************
+  
+  
+//******************************************************************************
+//                               DELAY BASED GSP
+//******************************************************************************
+bool
+  GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
+  {
+    NS_LOG_FUNCTION (this << item);
+    StartTime = Simulator::Now();
+ 
+    //Enqueue function goes here
+    //Threshold in miliseconds
+    if(m_tiq > GetThreshold () && Simulator::Now () > GetTimeout ())
+    {
+      NS_LOG_LOGIC("Queue Size is greater than Threshold");
+      DropBeforeEnqueue (item, FORCED_DROP);
+      SetTimeout(Simulator::Now () + GetInterval ());
+      return false;
+    }
+    else
+    {
+      bool retval = GetInternalQueue (0)->Enqueue (item);
 
+      NS_LOG_LOGIC ("Number packets " << GetInternalQueue (0)->GetNPackets ());
+      NS_LOG_LOGIC ("Number bytes " << GetInternalQueue (0)->GetNBytes ());
+
+      return retval;
+    }
+
+  }
+//******************************************************************************
+//******************************************************************************
+  
+  
   Ptr<QueueDiscItem>
   GspQueueDisc::DoDequeue (void)
   {
@@ -191,6 +234,22 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
     NS_LOG_FUNCTION (this);
   }
 
+  Ptr<const QueueDiscItem>
+  GspQueueDisc::DoDequeue ()
+  {
+   NS_LOG_FUNCTION (this);
+  m_tiq = StartTime - Simulator::Now();
+  
+    
+  if (!item)
+      {
+        NS_LOG_LOGIC ("Queue empty");
+        return 0;
+      }
+
+    return item;
+  }
+  
   bool
   GspQueueDisc::CheckConfig (void)
   {
