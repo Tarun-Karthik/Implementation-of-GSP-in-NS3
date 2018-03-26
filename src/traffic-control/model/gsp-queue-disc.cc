@@ -12,7 +12,7 @@ namespace ns3{
 
   TypeId GspQueueDisc::GetTypeId (void)
   {
-    static TypeId tid = TypeId (ns3::GspQueueDisc)
+    static TypeId tid = TypeId ("ns3::GspQueueDisc")
       .SetParent<DropTailQueue>()   //confirm
       .SetGroupName ("TrafficControl")
       .AddConstructor<GspQueueDisc> ()
@@ -29,21 +29,21 @@ namespace ns3{
                      MakeDoubleChecker<double> ())
       .AddAttribute("Interval",
                     "Value that will be incremented to the time out",
-                    TimeValue (),    //twice of RTT
+                    TimeValue (Seconds(0.2)),    //twice of RTT  | RTT = 100ms so initial interval value should be 200ms
                     MakeTimeAccessor (&GspQueueDisc::SetInterval,
                                       &GspQueueDisc::GetInterval),
                     MakeTimeChecker ())
       .AddAttribute("Adaptive Variable",
                     "Controlling the adaptation speed",
-                    TimeValue (),
+                    TimeValue (Seconds(1)),
                     MakeTimeAccessor (&GspQueueDisc::adapt),
                     MakeTimeChecker ())
       .AddAttribute("Threshold",
                     "Limit above which the packet should be dropped",
-                    DoubleValue (500),
+                    DoubleValue (),
                     MakeDoubleAccessor(&GspQueueDisc::SetThreshold,
                                        &GspQueueDisc::GetThreshold),
-                    MakeDoubleAccessor ())
+                    MakeDoubleChecker<double> ())
       .AddAttribute("Timeout",
                     "amount of time for which the packets will not be dropped",
                     TimeValue (Seconds(0)),
@@ -114,6 +114,7 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 {
   NS_LOG_FUNCTION (this << item);
 
+  Time cumTime = 0, maxTime;
   if(GetCurrentSize () + item->GetSize () > GetMaxSize ())
   {
     SetState (QUEUE_OVERFLOW);
@@ -126,7 +127,19 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
   {
     SetState (QUEUE_CLEAR);
   }
+  
+  // Update Cummulative time
 
+  cumTime += m_a()*time_above_threshold;
+
+  if(GetState()==QUEUE_CLEAR)
+    cumTime = cumTime - time_below_threshold;
+  
+
+  cumTime=min(maxTime, max(0, cumTime));
+
+  Time presetInterval = Seconds(200);
+  SetInterval( presetInterval / ( 1 + cumTime/adapt()));
   
 }
 
@@ -170,3 +183,4 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
   }
 
 }
+
