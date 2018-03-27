@@ -1,3 +1,26 @@
+/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
+/*
+ * Copyright (c) 2018 NITK Surathkal
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation;
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * Authors: Amshula U.S <usamshula@gmail.com>
+ *          A Tarun Karthik <tarunkarthik999@gmail.com>
+ *          Manoj Kumar <mnkumar493@gmail.com>
+ *          Mohit P. Tahiliani <tahiliani@nitk.edu.in>
+ */
+
 #include "ns3/log.h"
 #include "fifo-queue-disc.h"
 #include "ns3/object-factory.h"
@@ -62,7 +85,7 @@ namespace ns3{
                  "The amount of time taken by the packet in the queue",
                   StringValue (),
                   MakeTimeAccessor (&GspQueueDisc::m_tiq),
-                  MakeTimeChecker ()) 
+                  MakeTimeChecker ())
       .AddAttribute("StartTime",
                  "current time",
                   TimeValue (Seconds(0)),
@@ -136,14 +159,14 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
   {
     SetState (QUEUE_CLEAR);
   }
-  
+
   // Update Cummulative time
 
   cumTime += m_a()*time_above_threshold;
 
   if(GetState()==QUEUE_CLEAR)
     cumTime = cumTime - time_below_threshold;
-  
+
 
   cumTime=min(maxTime, max(0, cumTime));
 
@@ -178,8 +201,8 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 
 //******************************************************************************
 //******************************************************************************
-  
-  
+
+
 //******************************************************************************
 //                               DELAY BASED GSP
 //******************************************************************************
@@ -188,7 +211,7 @@ bool
   {
     NS_LOG_FUNCTION (this << item);
     StartTime = Simulator::Now();
- 
+
     //Enqueue function goes here
     //Threshold in miliseconds
     if(m_tiq > GetThreshold () && Simulator::Now () > GetTimeout ())
@@ -211,8 +234,8 @@ bool
   }
 //******************************************************************************
 //******************************************************************************
-  
-  
+
+
   Ptr<QueueDiscItem>
   GspQueueDisc::DoDequeue (void)
   {
@@ -239,8 +262,8 @@ bool
   {
    NS_LOG_FUNCTION (this);
   m_tiq = StartTime - Simulator::Now();
-  
-    
+
+
   if (!item)
       {
         NS_LOG_LOGIC ("Queue empty");
@@ -249,7 +272,7 @@ bool
 
     return item;
   }
-  
+
   bool
   GspQueueDisc::CheckConfig (void)
   {
@@ -263,4 +286,3 @@ bool
   }
 
 }
-
