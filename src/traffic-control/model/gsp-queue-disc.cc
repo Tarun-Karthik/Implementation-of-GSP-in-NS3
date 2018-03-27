@@ -246,12 +246,48 @@ namespace ns3{
   GspQueueDisc::DoPeek (void)
   {
     NS_LOG_FUNCTION (this);
+
+      Ptr<const QueueDiscItem> item = GetInternalQueue (0)->Peek ();
+
+      if (!item)
+        {
+          NS_LOG_LOGIC ("Queue empty");
+          return 0;
+        }
+
+      return item;
   }
 
   bool
   GspQueueDisc::CheckConfig (void)
   {
     NS_LOG_FUNCTION (this);
+    if (GetNQueueDiscClasses () > 0)
+      {
+        NS_LOG_ERROR ("GspQueueDisc cannot have classes");
+        return false;
+      }
+
+    if (GetNPacketFilters () > 0)
+      {
+        NS_LOG_ERROR ("GspQueueDisc needs no packet filter");
+        return false;
+      }
+
+    if (GetNInternalQueues () == 0)
+      {
+        // add a DropTail queue
+        AddInternalQueue (CreateObjectWithAttributes<DropTailQueue<QueueDiscItem> >
+                            ("MaxSize", QueueSizeValue (GetMaxSize ())));
+      }
+
+    if (GetNInternalQueues () != 1)
+      {
+        NS_LOG_ERROR ("GspQueueDisc needs 1 internal queue");
+        return false;
+      }
+
+    return true;
   }
 
   void
