@@ -89,8 +89,23 @@ namespace ns3{
       .AddAttribute("StartTime",
                  "current time",
                   TimeValue (Seconds(0)),
-		  MakeTimeAccessor (&GspQueueDisc::StartTime),
+		              MakeTimeAccessor (&GspQueueDisc::StartTime),
                   MakeTimeChecker ())
+      .AddAttribute ("BasicGsp",
+                  "Whether to use basic version of GSP",
+                  BooleanValue (true),
+                  MakeBooleanAccessor (&SfqQueueDisc::m_useBasicGsp),
+                  MakeBooleanChecker ())
+      .AddAttribute ("AdaptiveGsp",
+                     "Whether to use Adaptive version of GSP",
+                     BooleanValue (false),
+                     MakeBooleanAccessor (&SfqQueueDisc::m_useAdaptiveGsp),
+                     MakeBooleanChecker ())
+      .AddAttribute ("DelayedGsp",
+                     "Whether to use Delayed version of GSP",
+                     BooleanValue (false),
+                     MakeBooleanAccessor (&SfqQueueDisc::m_useDelayedGsp),
+                     MakeBooleanChecker ())
     ;
     return tid;
   }
@@ -107,139 +122,115 @@ namespace ns3{
   }
 
 
-//******************************************************************************
-//                        GSP BASIC
-//******************************************************************************
   bool
   GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
   {
     NS_LOG_FUNCTION (this << item);
     //Enqueue function goes here
-    if(GetCurrentSize () + item->GetSize () > GetThreshold () && Simulator::Now () > GetTimeout ())
+    if(m_useBasicGsp)
     {
-      NS_LOG_LOGIC("Queue Size is greater than Threshold");
-      DropBeforeEnqueue (item, FORCED_DROP);
-      SetTimeout(Simulator::Now () + GetInterval ());
-      return false;
+      if(GetCurrentSize () + item->GetSize () > GetThreshold () && Simulator::Now () > GetTimeout ())
+      {
+        NS_LOG_LOGIC("Queue Size is greater than Threshold");
+        DropBeforeEnqueue (item, FORCED_DROP);
+        SetTimeout(Simulator::Now () + GetInterval ());
+        return false;
+      }
+      else
+      {
+        bool retval = GetInternalQueue (0)->Enqueue (item);
+
+
+        NS_LOG_LOGIC ("Number packets " << GetInternalQueue (0)->GetNPackets ());
+        NS_LOG_LOGIC ("Number bytes " << GetInternalQueue (0)->GetNBytes ());
+
+        return retval;
+      }
     }
-    else
+    else if(m_useAdaptiveGsp)
     {
-      bool retval = GetInternalQueue (0)->Enqueue (item);
+      Time cumTime = 0, maxTime;
+      if(GetCurrentSize () + item->GetSize () > GetMaxSize ())
+      {
+        SetState (QUEUE_OVERFLOW);
+      }
+      else if( GetState () == QUEUE_OVERFLOW && GetCurrentSize () == 0)
+      {
+        SetState (QUEUE_DRAIN);
+      }
+      else if ( GetState () == QUEUE_DRAIN && GetCurrentSize () > GetThreshold ())
+      {
+        SetState (QUEUE_CLEAR);
+      }
+
+      // Update Cummulative time
+
+      cumTime += m_a()*time_above_threshold;
+
+      if(GetState()==QUEUE_CLEAR)
+        cumTime = cumTime - time_below_threshold;
 
 
-      NS_LOG_LOGIC ("Number packets " << GetInternalQueue (0)->GetNPackets ());
-      NS_LOG_LOGIC ("Number bytes " << GetInternalQueue (0)->GetNBytes ());
+      cumTime=min(maxTime, max(0, cumTime));
 
-      return retval;
+      Time presetInterval = Seconds(0.2);
+      SetInterval( presetInterval / ( 1 + cumTime/adapt()));
+
+      // After adapting the interval perform actions as in Basic GSP
+
+
+      //Basic GSP
+      if(GetCurrentSize () + item->GetSize () > GetThreshold () && Simulator::Now () > GetTimeout ())
+        {
+          NS_LOG_LOGIC("Queue Size is greater than Threshold");
+          DropBeforeEnqueue (item, FORCED_DROP);
+          SetTimeout(Simulator::Now () + GetInterval ());
+          return false;
+        }
+        else
+        {
+          bool retval = GetInternalQueue (0)->Enqueue (item);
+
+
+          NS_LOG_LOGIC ("Number packets " << GetInternalQueue (0)->GetNPackets ());
+          NS_LOG_LOGIC ("Number bytes " << GetInternalQueue (0)->GetNBytes ());
+
+          return retval;
+        }
     }
+    else if(m_useDelayedGsp)
+    {
+      StartTime = Simulator::Now();
 
+      //Enqueue function goes here
+      //Threshold in miliseconds
+      if(m_tiq > GetThreshold () && Simulator::Now () > GetTimeout ())
+      {
+        NS_LOG_LOGIC("Queue Size is greater than Threshold");
+        DropBeforeEnqueue (item, FORCED_DROP);
+        SetTimeout(Simulator::Now () + GetInterval ());
+        return false;
+      }
+      else
+      {
+        bool retval = GetInternalQueue (0)->Enqueue (item);
+
+        NS_LOG_LOGIC ("Number packets " << GetInternalQueue (0)->GetNPackets ());
+        NS_LOG_LOGIC ("Number bytes " << GetInternalQueue (0)->GetNBytes ());
+
+        return retval;
+      }
+    }
   }
-//******************************************************************************
-//******************************************************************************
-
-
-//******************************************************************************
-//                            Adaptive Gsp
-//******************************************************************************
-bool
-GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
-{
-  NS_LOG_FUNCTION (this << item);
-
-  Time cumTime = 0, maxTime;
-  if(GetCurrentSize () + item->GetSize () > GetMaxSize ())
-  {
-    SetState (QUEUE_OVERFLOW);
-  }
-  else if( GetState () == QUEUE_OVERFLOW && GetCurrentSize () == 0)
-  {
-    SetState (QUEUE_DRAIN);
-  }
-  else if ( GetState () == QUEUE_DRAIN && GetCurrentSize () > GetThreshold ())
-  {
-    SetState (QUEUE_CLEAR);
-  }
-
-  // Update Cummulative time
-
-  cumTime += m_a()*time_above_threshold;
-
-  if(GetState()==QUEUE_CLEAR)
-    cumTime = cumTime - time_below_threshold;
-
-
-  cumTime=min(maxTime, max(0, cumTime));
-
-  Time presetInterval = Seconds(0.2);
-  SetInterval( presetInterval / ( 1 + cumTime/adapt()));
-
-  // After adapting the interval perform actions as in Basic GSP
-
-
-  //Basic GSP
-  if(GetCurrentSize () + item->GetSize () > GetThreshold () && Simulator::Now () > GetTimeout ())
-    {
-      NS_LOG_LOGIC("Queue Size is greater than Threshold");
-      DropBeforeEnqueue (item, FORCED_DROP);
-      SetTimeout(Simulator::Now () + GetInterval ());
-      return false;
-    }
-    else
-    {
-      bool retval = GetInternalQueue (0)->Enqueue (item);
-
-
-      NS_LOG_LOGIC ("Number packets " << GetInternalQueue (0)->GetNPackets ());
-      NS_LOG_LOGIC ("Number bytes " << GetInternalQueue (0)->GetNBytes ());
-
-      return retval;
-    }
-}
-
-
-
-
-//******************************************************************************
-//******************************************************************************
-
-
-//******************************************************************************
-//                               DELAY BASED GSP
-//******************************************************************************
-bool
-  GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
-  {
-    NS_LOG_FUNCTION (this << item);
-    StartTime = Simulator::Now();
-
-    //Enqueue function goes here
-    //Threshold in miliseconds
-    if(m_tiq > GetThreshold () && Simulator::Now () > GetTimeout ())
-    {
-      NS_LOG_LOGIC("Queue Size is greater than Threshold");
-      DropBeforeEnqueue (item, FORCED_DROP);
-      SetTimeout(Simulator::Now () + GetInterval ());
-      return false;
-    }
-    else
-    {
-      bool retval = GetInternalQueue (0)->Enqueue (item);
-
-      NS_LOG_LOGIC ("Number packets " << GetInternalQueue (0)->GetNPackets ());
-      NS_LOG_LOGIC ("Number bytes " << GetInternalQueue (0)->GetNBytes ());
-
-      return retval;
-    }
-
-  }
-//******************************************************************************
-//******************************************************************************
-
 
   Ptr<QueueDiscItem>
   GspQueueDisc::DoDequeue (void)
   {
     NS_LOG_FUNCTION (this);
+    if(m_useDelayedGsp)
+    {
+      m_tiq = StartTime - Simulator::Now();
+    }
     Ptr<QueueDiscItem> item = GetInternalQueue (0)->Dequeue ();
 
     if (!item)
@@ -255,22 +246,6 @@ bool
   GspQueueDisc::DoPeek (void)
   {
     NS_LOG_FUNCTION (this);
-  }
-
-  Ptr<const QueueDiscItem>
-  GspQueueDisc::DoDequeue ()
-  {
-   NS_LOG_FUNCTION (this);
-  m_tiq = StartTime - Simulator::Now();
-
-
-  if (!item)
-      {
-        NS_LOG_LOGIC ("Queue empty");
-        return 0;
-      }
-
-    return item;
   }
 
   bool
