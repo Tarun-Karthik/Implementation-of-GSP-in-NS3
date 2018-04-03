@@ -58,12 +58,27 @@
 
     QueueState GetState(void) const;
 
+    Time min(Time A, Time B);
+    
+    Time max(Time A, Time B);
+
   private:
     virtual bool DoEnqueue (Ptr<QueueDiscItem> item);
     virtual Ptr<QueueDiscItem> DoDequeue (void);
     virtual Ptr<const QueueDiscItem> DoPeek (void);
     virtual bool CheckConfig (void);
     virtual void InitializeParams (void);
+    
+
+    double m_a;
+    double m_threshold;
+    Time m_adapt;
+    Time m_interval;
+    Time m_secThreshold;
+    Time m_timeout;
+    Time m_tiq;
+    Time m_timeAboveThreshold;
+    Time m_timeBelowThreshold;
 
     GspMode m_mode;
     QueueState m_state;
@@ -71,6 +86,6 @@
  
     Time cumTime;
   };
- }
+ };
 
  #endif

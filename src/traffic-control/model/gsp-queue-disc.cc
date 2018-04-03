@@ -26,6 +26,14 @@
 #include "ns3/object-factory.h"
 #include "ns3/drop-tail-queue.h"
 #include "ns3/net-device-queue-interface.h"
+#include "ns3/enum.h"
+#include "ns3/uinteger.h"
+#include "ns3/double.h"
+#include "ns3/simulator.h"
+#include "ns3/nstime.h"
+#include "ns3/abort.h"
+#include "gsp-queue-disc.h"
+
 
 namespace ns3{
 
@@ -36,7 +44,7 @@ NS_OBJECT_ENSURE_REGISTERED (GspQueueDisc);
 TypeId GspQueueDisc::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::GspQueueDisc")
-    .SetParent<DropTailQueue>()   //confirm
+    .SetParent<QueueDisc>()   //confirm
     .SetGroupName ("TrafficControl")
     .AddConstructor<GspQueueDisc> ()
     .AddAttribute ("MaxSize",
@@ -77,46 +85,41 @@ TypeId GspQueueDisc::GetTypeId (void)
                   MakeTimeChecker ())
     .AddAttribute("State",
                   "Determines the state of the Queue",
-                  EnumValue (QUEUE_CLEAR),
+                  EnumValue (),
                   MakeEnumAccessor (&GspQueueDisc::SetState,
                                     &GspQueueDisc::GetState),
-                  MakeEnumChecker (QUEUE_CLEAR,"QUEUE_CLEAR".
+                  MakeEnumChecker (QUEUE_CLEAR,"QUEUE_CLEAR",
                                    QUEUE_OVERFLOW,"QUEUE_OVERFLOW",
                                    QUEUE_DRAIN,"QUEUE_DRAIN"))
     .AddAttribute ("TimeInQueue",
                    "The amount of time taken by the packet in the queue",
-                   StringValue (),
+                   TimeValue (),
                    MakeTimeAccessor (&GspQueueDisc::m_tiq),
                    MakeTimeChecker ())
-    .AddAttribute("StartTime",
-                  "current time",
-                  TimeValue (Seconds(0)),
-		              MakeTimeAccessor (&GspQueueDisc::m_startTime),
-                  MakeTimeChecker ())
     .AddAttribute("Mode",
                   "Determines which GSP algorithm to use",
-                  EnumValue(BASIC_GSP),
+                  EnumValue(),
                   MakeEnumAccessor(&GspQueueDisc::GetGspMode,
-                                   &GspQueueDisc::SetGspMode)
+                                   &GspQueueDisc::SetGspMode),
                   MakeEnumChecker(BASIC_GSP, "BASIC_GSP",
                                   ADAPTIVE_GSP, "ADAPTIVE_GSP",
                                   DELAY_GSP, "DELAY_GSP"))
-    .AddAttribute("TimeAboveThreshold"
+    .AddAttribute("TimeAboveThreshold",
                   "Accumulates time difference whenever a packet spends more time than the threshold",
                   TimeValue(Seconds(0)),
                   MakeTimeAccessor (&GspQueueDisc::m_timeAboveThreshold),
                   MakeTimeChecker())
-    .AddAttribute("TimeBelowThreshold"
+    .AddAttribute("TimeBelowThreshold",
                   "Accumulates time difference whenever a packet spends less time than the threshold",
                   TimeValue(Seconds(0)),
                   MakeTimeAccessor (&GspQueueDisc::m_timeBelowThreshold),
-                  MakeTimeChecker())
+                  MakeTimeChecker ())
   ;
   return tid;
 }
 
 GspQueueDisc::GspQueueDisc ()
-  : FifoQueueDisc () //check parameters to be SetNetDevice
+  : QueueDisc (QueueDiscSizePolicy::SINGLE_INTERNAL_QUEUE) //check parameters to be SetNetDevice
 {
   NS_LOG_FUNCTION (this);
 }
@@ -133,10 +136,10 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 
   if(m_mode == BASIC_GSP)
     {
-      if(GetCurrentSize () + item->GetSize () > m_threshold && Simulator::Now () > m_timeout)
+      if((GetCurrentSize ()).GetValue() + item->GetSize () > m_threshold && Simulator::Now () > m_timeout)
         {
           NS_LOG_LOGIC("Queue Size is greater than Threshold");
-          DropBeforeEnqueue (item, FORCED_DROP);
+          DropBeforeEnqueue (item, "FORCED_DROP");
           m_timeout = Simulator::Now () + m_interval;
           return false;
         }
@@ -151,15 +154,15 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
   else if(m_mode == ADAPTIVE_GSP)
     {
       
-      if(GetCurrentSize () + item->GetSize () > GetMaxSize ())
+      if((GetCurrentSize ()).GetValue() + item->GetSize () > (GetMaxSize ()).GetValue())
         {
           SetState (QUEUE_OVERFLOW);
         }
-      else if( GetState () == QUEUE_OVERFLOW && GetCurrentSize () == 0)
+      else if( GetState () == QUEUE_OVERFLOW && (GetCurrentSize ()).GetValue() == 0)
         {
           SetState (QUEUE_DRAIN);
         }
-      else if ( GetState () == QUEUE_DRAIN && GetCurrentSize () > m_threshold)
+      else if ( GetState () == QUEUE_DRAIN && (GetCurrentSize ()).GetValue() > m_threshold)
         {
           SetState (QUEUE_CLEAR);
         }
@@ -169,14 +172,14 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
       if(GetState()==QUEUE_CLEAR)
         cumTime = cumTime - m_timeBelowThreshold;
       
-      cumTime=min(m_maxTime, max(0, cumTime));
+      cumTime=min(m_maxTime, max(Seconds(0), cumTime));
       Time presetInterval = Time(Seconds(0.2));
       m_interval = (presetInterval / ( 1 + cumTime/m_adapt));
 
-      if(GetCurrentSize () + item->GetSize () > m_threshold && Simulator::Now () > m_timeout)
+      if((GetCurrentSize ()).GetValue() + item->GetSize () > m_threshold && Simulator::Now () > m_timeout)
         {
           NS_LOG_LOGIC("Queue Size is greater than Threshold");
-          DropBeforeEnqueue (item, FORCED_DROP);
+          DropBeforeEnqueue (item, "FORCED_DROP");
           m_timeout = Simulator::Now () + m_interval;
           return false;
         }
@@ -193,7 +196,7 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
       if(m_tiq > m_secThreshold && Simulator::Now () > m_timeout)
         {
           NS_LOG_LOGIC("Queue Size is greater than Threshold");
-          DropBeforeEnqueue (item, FORCED_DROP);
+          DropBeforeEnqueue (item, "FORCED_DROP");
           m_timeout = Simulator::Now () + m_interval;
           return false;
         }
@@ -205,6 +208,8 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           return retval;
         }
     }
+    else
+      return false;
 }
 
 Ptr<QueueDiscItem>
@@ -220,7 +225,7 @@ GspQueueDisc::DoDequeue (void)
 
   Time t_queueTime = Time(Seconds (Simulator::Now () - item->GetTimeStamp ()));
   
-  if(m_mode = DELAY_GSP)
+  if(m_mode == DELAY_GSP)
     {
       m_tiq = t_queueTime;
     }
@@ -306,11 +311,28 @@ GspQueueDisc::SetGspMode(GspMode mode)
 }
 
 GspQueueDisc::GspMode
-GspQueueDisc::GetGspMode()
+GspQueueDisc::GetGspMode(void) const
 {
   return m_mode;
 }
 
+Time 
+GspQueueDisc::min(Time A, Time B)
+{
+  if(A.GetSeconds() > B.GetSeconds())
+    return B;
+  else
+    return A;
+}
+
+Time 
+GspQueueDisc::max(Time A, Time B)
+{
+  if(A.GetSeconds() < B.GetSeconds())
+    return B;
+  else
+    return A;
+}
 void
 GspQueueDisc::SetState(QueueState state)
 {
@@ -326,7 +348,7 @@ GspQueueDisc::SetState(QueueState state)
 }
 
 GspQueueDisc::QueueState
-GspQueueDisc::GetState()
+GspQueueDisc::GetState(void) const
 {
   return m_state;
 }
