@@ -1,7 +1,7 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2018 NITK Surathkal
- *
+ * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation;
@@ -53,29 +53,26 @@ TypeId GspQueueDisc::GetTypeId (void)
     .AddAttribute("Interval",
                   "Value that will be incremented to the time out",
                   TimeValue (Seconds(0.2)),
-                  MakeTimeAccessor (&GspQueueDisc::SetInterval,
-                                    &GspQueueDisc::GetInterval),
+                  MakeTimeAccessor (&GspQueueDisc::m_interval),
                   MakeTimeChecker ())
-    .AddAttribute("Adaptive Variable",
+    .AddAttribute("AdaptiveVariable",
                   "Controlling the adaptation speed",
                   TimeValue (Seconds(1)),
-                  MakeTimeAccessor (&GspQueueDisc::adapt),
+                  MakeTimeAccessor (&GspQueueDisc::m_adapt),
                   MakeTimeChecker ())
     .AddAttribute("Threshold",
                   "Limit above which the packet should be dropped",
                   DoubleValue (),
-                  MakeDoubleAccessor(&GspQueueDisc::SetThreshold,
-                                     &GspQueueDisc::GetThreshold),
+                  MakeDoubleAccessor(&GspQueueDisc::m_threshold),
                   MakeDoubleChecker<double> ())
     .AddAttribute("Timeout",
                   "amount of time for which the packets will not be dropped",
                   TimeValue (Seconds(0)),
-                  MakeTimeAccessor (&GspQueueDisc::SetTimeout,
-                                    &GspQueueDisc::GetTimeout),
+                  MakeTimeAccessor (&GspQueueDisc::m_timeout),
                   MakeTimeChecker ())
     .AddAttribute("State",
                   "Determines the state of the Queue",
-                  EnumValue (QUEUE_STATE),
+                  EnumValue (QUEUE_CLEAR),
                   MakeEnumAccessor (&GspQueueDisc::SetState,
                                     &GspQueueDisc::GetState),
                   MakeEnumChecker (QUEUE_CLEAR,"QUEUE_CLEAR".
@@ -89,23 +86,26 @@ TypeId GspQueueDisc::GetTypeId (void)
     .AddAttribute("StartTime",
                   "current time",
                   TimeValue (Seconds(0)),
-		              MakeTimeAccessor (&GspQueueDisc::StartTime),
+		              MakeTimeAccessor (&GspQueueDisc::m_startTime),
                   MakeTimeChecker ())
-    .AddAttribute ("BasicGsp",
-                   "Whether to use basic version of GSP",
-                   BooleanValue (true),
-                   MakeBooleanAccessor (&SfqQueueDisc::m_useBasicGsp),
-                   MakeBooleanChecker ())
-    .AddAttribute ("AdaptiveGsp",
-                   "Whether to use Adaptive version of GSP",
-                   BooleanValue (false),
-                   MakeBooleanAccessor (&SfqQueueDisc::m_useAdaptiveGsp),
-                   MakeBooleanChecker ())
-    .AddAttribute ("DelayedGsp",
-                   "Whether to use Delayed version of GSP",
-                   BooleanValue (false),
-                   MakeBooleanAccessor (&SfqQueueDisc::m_useDelayedGsp),
-                   MakeBooleanChecker ())
+    .AddAttribute("Mode",
+                  "Determines which GSP algorithm to use",
+                  EnumValue(BASIC_GSP),
+                  MakeEnumAccessor(&GspQueueDisc::GetMode,
+                                   &GspQueueDisc::SetMode)
+                  MakeEnumChecker(BASIC_GSP, "BASIC_GSP",
+                                  ADAPTIVE_GSP, "ADAPTIVE_GSP",
+                                  DELAY_GSP, "DELAY_GSP"))
+    .AddAttribute("TimeAboveThreshold"
+                  "Accumulates time difference whenever a packet spends more time than the threshold",
+                  TimeValue(Seconds(0)),
+                  MakeTimeAccessor (&GspQueueDisc::m_timeAboveThreshold),
+                  MakeTimeChecker())
+    .AddAttribute("TimeBelowThreshold"
+                  "Accumulates time difference whenever a packet spends less time than the threshold",
+                  TimeValue(Seconds(0)),
+                  MakeTimeAccessor (&GspQueueDisc::m_timeBelowThreshold),
+                  MakeTimeChecker())
   ;
   return tid;
 }
@@ -145,7 +145,8 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
     }
   else if(m_useAdaptiveGsp)
     {
-      Time cumTime = 0, maxTime;
+      Time m_cumTime = 0;
+      
       if(GetCurrentSize () + item->GetSize () > GetMaxSize ())
         {
           SetState (QUEUE_OVERFLOW);
@@ -158,12 +159,16 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
         {
           SetState (QUEUE_CLEAR);
         }
-      cumTime += m_a()*time_above_threshold;
+      
+      cumTime += m_a*m_timeAboveThreshold;
+      
       if(GetState()==QUEUE_CLEAR)
-        cumTime = cumTime - time_below_threshold;
-      cumTime=min(maxTime, max(0, cumTime));
+        cumTime = cumTime - m_timeBelowThreshold;
+      
+      cumTime=min(m_maxTime, max(0, cumTime));
       Time presetInterval = Seconds(0.2);
-      SetInterval( presetInterval / ( 1 + cumTime/adapt()));
+      SetInterval( presetInterval / ( 1 + cumTime/m_adapt));
+      
       if(GetCurrentSize () + item->GetSize () > GetThreshold () && Simulator::Now () > GetTimeout ())
         {
           NS_LOG_LOGIC("Queue Size is greater than Threshold");
@@ -233,21 +238,25 @@ bool
 GspQueueDisc::CheckConfig (void)
 {
   NS_LOG_FUNCTION (this);
+  
   if(GetNQueueDiscClasses () > 0)
     {
       NS_LOG_ERROR ("GspQueueDisc cannot have classes");
       return false;
     }
+  
   if(GetNPacketFilters () > 0)
     {
       NS_LOG_ERROR ("GspQueueDisc needs no packet filter");
       return false;
     }
+  
   if(GetNInternalQueues () == 0)
     {
       AddInternalQueue (CreateObjectWithAttributes<DropTailQueue<QueueDiscItem> >
                             ("MaxSize", QueueSizeValue (GetMaxSize ())));
     }
+  
   if(GetNInternalQueues () != 1)
     {
       NS_LOG_ERROR ("GspQueueDisc needs 1 internal queue");
@@ -256,10 +265,60 @@ GspQueueDisc::CheckConfig (void)
   return true;
 }
 
+void 
+GspQueueDisc::SetMode(GspMode mode)
+{
+  if(mode == BASIC_GSP || mode == ADAPTIVE_GSP || mode == DELAY_GSP)
+  {
+    m_mode = mode;
+  }
+  else 
+  {
+    NS_ABORT_MSG("Unknown GSP mode");
+    return ;
+  }
+
+  if(m_mode == BASIC_GSP || m_mode == DELAY_GSP)
+  {
+    m_interval = Seconds(0.2);
+  }
+
+  return ;
+}
+
+GspQueueDisc::GspMode
+GspQueueDisc::GetMode()
+{
+  return m_mode;
+}
+
+void
+GspQueueDisc::SetState(QueueState state)
+{
+  if(state == QUEUE_CLEAR || state == QUEUE_OVERFLOW || state == QUEUE_DRAIN)
+  {
+    m_state = state;
+  }
+  else
+  {
+    NS_ABORT_MSG("Unkown Queue State");
+    return ;
+  }
+}
+
+GspQueueDisc::QueueState
+GspQueueDisc::GetState()
+{
+  return m_state;
+}
+
 void
 GspQueueDisc::InitializeParams (void)
 {
   NS_LOG_FUNCTION (this);
+
+  m_maxTime = Seconds(60);
 }
 
 } // namespace ns3
+

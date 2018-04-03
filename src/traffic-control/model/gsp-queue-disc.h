@@ -36,12 +36,38 @@
 
     virtual ~GspQueueDisc ();
 
+    enum GspMode
+    {
+      BASIC_GSP,
+      ADAPTIVE_GSP,
+      DELAY_GSP,
+    };
+
+    void SetMode(GspMode mode);
+
+    GspMode GetMode(void) const;
+
+    enum QueueState
+    {
+      QUEUE_CLEAR,
+      QUEUE_OVERFLOW,
+      QUEUE_DRAIN,
+    };
+
+    void SetState(QueueState state);
+
+    QueueState GetState(void) const;
+
   private:
     virtual bool DoEnqueue (Ptr<QueueDiscItem> item);
     virtual Ptr<QueueDiscItem> DoDequeue (void);
     virtual Ptr<const QueueDiscItem> DoPeek (void);
     virtual bool CheckConfig (void);
     virtual void InitializeParams (void);
+
+    GspMode m_mode;
+    QueueState m_state;
+    Time m_maxTime;
   };
  }
 
