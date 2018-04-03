@@ -43,9 +43,9 @@
       DELAY_GSP,
     };
 
-    void SetMode(GspMode mode);
+    void SetGspMode(GspMode mode);
 
-    GspMode GetMode(void) const;
+    GspMode GetGspMode(void) const;
 
     enum QueueState
     {
@@ -68,6 +68,8 @@
     GspMode m_mode;
     QueueState m_state;
     Time m_maxTime;
+ 
+    Time cumTime;
   };
  }
 

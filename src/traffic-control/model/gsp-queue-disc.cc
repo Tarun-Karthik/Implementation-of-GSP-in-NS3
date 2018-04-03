@@ -61,10 +61,15 @@ TypeId GspQueueDisc::GetTypeId (void)
                   MakeTimeAccessor (&GspQueueDisc::m_adapt),
                   MakeTimeChecker ())
     .AddAttribute("Threshold",
-                  "Limit above which the packet should be dropped",
+                  "Limit in queue size above which the packet should be dropped",
                   DoubleValue (),
                   MakeDoubleAccessor(&GspQueueDisc::m_threshold),
                   MakeDoubleChecker<double> ())
+    .AddAttribute("ThresholdSeconds",
+                  "Equivalent to Threshold but in Seconds",
+                  TimeValue(),
+                  MakeTimeAccessor(&GspQueueDisc::m_secThreshold),
+                  MakeTimeChecker())
     .AddAttribute("Timeout",
                   "amount of time for which the packets will not be dropped",
                   TimeValue (Seconds(0)),
@@ -91,8 +96,8 @@ TypeId GspQueueDisc::GetTypeId (void)
     .AddAttribute("Mode",
                   "Determines which GSP algorithm to use",
                   EnumValue(BASIC_GSP),
-                  MakeEnumAccessor(&GspQueueDisc::GetMode,
-                                   &GspQueueDisc::SetMode)
+                  MakeEnumAccessor(&GspQueueDisc::GetGspMode,
+                                   &GspQueueDisc::SetGspMode)
                   MakeEnumChecker(BASIC_GSP, "BASIC_GSP",
                                   ADAPTIVE_GSP, "ADAPTIVE_GSP",
                                   DELAY_GSP, "DELAY_GSP"))
@@ -126,13 +131,13 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 {
   NS_LOG_FUNCTION (this << item);
 
-  if(m_useBasicGsp)
+  if(m_mode == BASIC_GSP)
     {
-      if(GetCurrentSize () + item->GetSize () > GetThreshold () && Simulator::Now () > GetTimeout ())
+      if(GetCurrentSize () + item->GetSize () > m_threshold && Simulator::Now () > m_timeout)
         {
           NS_LOG_LOGIC("Queue Size is greater than Threshold");
           DropBeforeEnqueue (item, FORCED_DROP);
-          SetTimeout(Simulator::Now () + GetInterval ());
+          m_timeout = Simulator::Now () + m_interval;
           return false;
         }
       else
@@ -143,9 +148,8 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           return retval;
         }
     }
-  else if(m_useAdaptiveGsp)
+  else if(m_mode == ADAPTIVE_GSP)
     {
-      Time m_cumTime = 0;
       
       if(GetCurrentSize () + item->GetSize () > GetMaxSize ())
         {
@@ -155,7 +159,7 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
         {
           SetState (QUEUE_DRAIN);
         }
-      else if ( GetState () == QUEUE_DRAIN && GetCurrentSize () > GetThreshold ())
+      else if ( GetState () == QUEUE_DRAIN && GetCurrentSize () > m_threshold)
         {
           SetState (QUEUE_CLEAR);
         }
@@ -166,14 +170,14 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
         cumTime = cumTime - m_timeBelowThreshold;
       
       cumTime=min(m_maxTime, max(0, cumTime));
-      Time presetInterval = Seconds(0.2);
-      SetInterval( presetInterval / ( 1 + cumTime/m_adapt));
-      
-      if(GetCurrentSize () + item->GetSize () > GetThreshold () && Simulator::Now () > GetTimeout ())
+      Time presetInterval = Time(Seconds(0.2));
+      m_interval = (presetInterval / ( 1 + cumTime/m_adapt));
+
+      if(GetCurrentSize () + item->GetSize () > m_threshold && Simulator::Now () > m_timeout)
         {
           NS_LOG_LOGIC("Queue Size is greater than Threshold");
           DropBeforeEnqueue (item, FORCED_DROP);
-          SetTimeout(Simulator::Now () + GetInterval ());
+          m_timeout = Simulator::Now () + m_interval;
           return false;
         }
       else
@@ -182,16 +186,15 @@ GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           NS_LOG_LOGIC ("Number packets " << GetInternalQueue (0)->GetNPackets ());
           NS_LOG_LOGIC ("Number bytes " << GetInternalQueue (0)->GetNBytes ());
           return retval;
-        }
+        }      
     }
-  else if(m_useDelayedGsp)
+  else if(m_mode == DELAY_GSP)
     {
-      StartTime = Simulator::Now();
-      if(m_tiq > GetThreshold () && Simulator::Now () > GetTimeout ())
+      if(m_tiq > m_secThreshold && Simulator::Now () > m_timeout)
         {
           NS_LOG_LOGIC("Queue Size is greater than Threshold");
           DropBeforeEnqueue (item, FORCED_DROP);
-          SetTimeout(Simulator::Now () + GetInterval ());
+          m_timeout = Simulator::Now () + m_interval;
           return false;
         }
       else
@@ -208,15 +211,30 @@ Ptr<QueueDiscItem>
 GspQueueDisc::DoDequeue (void)
 {
   NS_LOG_FUNCTION (this);
-  if(m_useDelayedGsp)
-    {
-      m_tiq = StartTime - Simulator::Now();
-    }
   Ptr<QueueDiscItem> item = GetInternalQueue (0)->Dequeue ();
   if(!item)
     {
       NS_LOG_LOGIC ("Queue empty");
       return 0;
+    }
+
+  Time t_queueTime = Time(Seconds (Simulator::Now () - item->GetTimeStamp ()));
+  
+  if(m_mode = DELAY_GSP)
+    {
+      m_tiq = t_queueTime;
+    }
+
+    if(m_mode == ADAPTIVE_GSP)
+    {
+      if(t_queueTime > m_secThreshold)
+      {
+        m_timeAboveThreshold = Time (Seconds (t_queueTime - m_secThreshold));
+      }
+      else
+      {
+        m_timeBelowThreshold = Time (Seconds (m_secThreshold - t_queueTime));
+      }
     }
   return item;
 }
@@ -266,7 +284,7 @@ GspQueueDisc::CheckConfig (void)
 }
 
 void 
-GspQueueDisc::SetMode(GspMode mode)
+GspQueueDisc::SetGspMode(GspMode mode)
 {
   if(mode == BASIC_GSP || mode == ADAPTIVE_GSP || mode == DELAY_GSP)
   {
@@ -280,14 +298,15 @@ GspQueueDisc::SetMode(GspMode mode)
 
   if(m_mode == BASIC_GSP || m_mode == DELAY_GSP)
   {
-    m_interval = Seconds(0.2);
+    cumTime = Time(Seconds(0));
+    m_interval = Time(Seconds(0.2));
   }
-
+  
   return ;
 }
 
 GspQueueDisc::GspMode
-GspQueueDisc::GetMode()
+GspQueueDisc::GetGspMode()
 {
   return m_mode;
 }
@@ -317,7 +336,9 @@ GspQueueDisc::InitializeParams (void)
 {
   NS_LOG_FUNCTION (this);
 
-  m_maxTime = Seconds(60);
+  //Initialize m_secThreshold using bandwidth-delay product
+  m_maxTime = Time(Seconds(60));
+  cumTime = Time(Seconds(0));
 }
 
 } // namespace ns3
