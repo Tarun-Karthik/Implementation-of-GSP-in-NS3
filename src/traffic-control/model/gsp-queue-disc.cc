@@ -102,7 +102,7 @@ TypeId GspQueueDisc::GetTypeId (void)
 }
 
 GspQueueDisc::GspQueueDisc ()
-  : QueueDisc (QueueDiscSizePolicy::SINGLE_INTERNAL_QUEUE)  //check parameters to be SetNetDevice
+  : QueueDisc (QueueDiscSizePolicy::SINGLE_INTERNAL_QUEUE) 
 {
   NS_LOG_FUNCTION (this);
 }
@@ -147,7 +147,7 @@ bool GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
       if (GetCurrentSize ().GetValue () + item->GetSize () > m_threshold && Simulator::Now () > m_timeout)
         {
           NS_LOG_LOGIC ("Queue Size is greater than Threshold");
-          DropBeforeEnqueue (item, "FORCED_DROP");
+          DropBeforeEnqueue (item, FORCED_DROP);
           m_timeout = Simulator::Now () + m_interval;
           return false;
         }
@@ -182,7 +182,7 @@ bool GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
       if (GetCurrentSize ().GetValue () + item->GetSize () > m_threshold && Simulator::Now () > m_timeout)
         {
           NS_LOG_LOGIC ("Queue Size is greater than Threshold");
-          DropBeforeEnqueue (item, "FORCED_DROP");
+          DropBeforeEnqueue (item, FORCED_DROP);
           m_timeout = Simulator::Now () + m_interval;
           return false;
         }
@@ -192,7 +192,7 @@ bool GspQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
       if (m_tiq > m_secThreshold && Simulator::Now () > m_timeout)
         {
           NS_LOG_LOGIC ("Time in Queue is greater than Threshold");
-          DropBeforeEnqueue (item, "FORCED_DROP");
+          DropBeforeEnqueue (item, FORCED_DROP);
           m_timeout = Simulator::Now () + m_interval;
           return false;
         }
