@@ -1,117 +1,69 @@
+# Implementation of Global Synchronization Protection scheme in NS-3
+## Course Code: CO365
 
-    The Network Simulator, Version 3
-    --------------------------------
+### GSP
+The Global Synchronization Protection (GSP) Scheme is a regular tail drop packet queueing 
+mechanisim that prevents global synchronisation. Consider N Tcp flows who share a common
+bottleneck link. All the flows simultaneously probe the link for extra bandwidth by
+gradually increasing their cwnd. When the aggregate bit rate of the flows saturates the
+link capacity, the link enters congestion. Any further increase has no effect on the link
+throughput and only contributes to the queue length and delay accumulation. When the 
+tail-drop queue drops the first packet, the queue length immediately drops by only one 
+unit but takes an entire RTT before the cwnd reduction induced by the packet loss shows
+its full impact.
+During the RTT interval that follows the first drop event the TCP senders of all flows
+keep probing for bandwidth at the same pace as before. That is, the packets arriving
+to the queue exceed those departing by N /2  units. Since the queue is already full,
+it drops N /2 packets. If each dropped packet belongs to a different flow, every other 
+flow ends up contracting its cwnd at the same time. If the buffer is far smaller than
+required by the BDP rule, the queue depletes and the link operates at sub-capacity levels
+until the combined cwnd of all flows returns large enough to establish again a continuous
+presence of packets in the queue. The queue collapse may be less severe when losses hit
+one or more flows multiple times, so that the fraction of the total population affected
+by losses is smaller than 50%, but statistically it still presents a problem.
 
-Table of Contents:
-------------------
+There are three varients of GSP algorithm:  basic, adaptive, and delay-based. 
+#### Basic GSP
+In this algorithm global synchronization can be averted by removing the extra 
+packet drops after the first one. A Threshold is set well below the buffer limit.
+When the first packet is dropped a time interval is started during which all
+threshold voilations are ignored. At the end of the no-drop interval the queue length
+is well below the drop threshold and requires no further action.
 
-1) An overview
-2) Building ns-3
-3) Running ns-3
-4) Getting access to the ns-3 documentation
-5) Working with the development version of ns-3
+### Adaptive GSP
+Since the same GSP configuration must work well under most scenarios of 
+practical interest, the scheme must adapt the interval value automatically. 
+In single-drop operation the queue is most of the time below the threshold 
+and drops a packet only once in many expirations of the maximum interval 
+duration. No adaptation is necessary. The interval value must be reduced 
+as soon as the queue starts spending more time above the threshold than
+below. let presetInt be the initial and maximum setting for the adaptive 
+interval variable, tau the time constant for the adaptation loop, and alpha 
+the emphasis factor for the time spent above the threshold, such that the 
+reaction to load changes is stronger. As a rule of thumb, tau should be
+comfortably larger than presetInt (we set the ratio at 5) and alpha should
+not be much larger than 1 
 
-Note:  Much more substantial information about ns-3 can be found at
-http://www.nsnam.org
+at every packet arrival DO:
+cumulTime += (alpha * time_above_threshold – time_below_threshold)
+cumulTime = min(maxTime, max(0, cumulTime))
+interval = presetInt / (1 + cumulTime / tau)
+NEXT proceed with basic GSP algorithm 
 
-1) An Open Source project
--------------------------
+### Delay-Based GSP
+We enable delay-based operation in GSP by generalizing the meaning of the 
+condition queue > threshold. Both terms can be expressed in memory-size units, 
+time units, or a combination of the two. The queuing delay can be measured
+with one of the methods of CoDel and PIE. CoDel uses timestamps that it 
+associates with packets when they arrive to the queue and then subtracts from 
+the times of departure. PIE estimates the drain rate for translation of the 
+actual queue size into an expected queuing delay. In our experiments we used
+the timestamp approach.
 
-ns-3 is a free open source project aiming to build a discrete-event
-network simulator targeted for simulation research and education.   
-This is a collaborative project; we hope that
-the missing pieces of the models we have not yet implemented
-will be contributed by the community in an open collaboration
-process.
 
-The process of contributing to the ns-3 project varies with
-the people involved, the amount of time they can invest
-and the type of model they want to work on, but the current
-process that the project tries to follow is described here:
-http://www.nsnam.org/developers/contributing-code/
+### References
 
-This README excerpts some details from a more extensive
-tutorial that is maintained at:
-http://www.nsnam.org/documentation/latest/
+[1] Wolfram Lautenschlaeger,  Andrea Francini Global Synchronization Protection for Bandwidth
+Sharing TCP Flows in High-Speed Links 
 
-2) Building ns-3
-----------------
-
-The code for the framework and the default models provided
-by ns-3 is built as a set of libraries. User simulations
-are expected to be written as simple programs that make
-use of these ns-3 libraries.
-
-To build the set of default libraries and the example
-programs included in this package, you need to use the
-tool 'waf'. Detailed information on how to use waf is
-included in the file doc/build.txt
-
-However, the real quick and dirty way to get started is to
-type the command
-  ./waf configure --enable-examples
-followed by
-  ./waf 
-in the directory which contains
-this README file. The files built will be copied in the
-build/ directory.
-
-The current codebase is expected to build and run on the
-set of platforms listed in the RELEASE_NOTES file.
-
-Other platforms may or may not work: we welcome patches to 
-improve the portability of the code to these other platforms. 
-
-3) Running ns-3
----------------
-
-On recent Linux systems, once you have built ns-3 (with examples
-enabled), it should be easy to run the sample programs with the
-following command, such as:
-
-  ./waf --run simple-global-routing
-
-That program should generate a simple-global-routing.tr text 
-trace file and a set of simple-global-routing-xx-xx.pcap binary
-pcap trace files, which can be read by tcpdump -tt -r filename.pcap
-The program source can be found in the examples/routing directory.
-
-4) Getting access to the ns-3 documentation
--------------------------------------------
-
-Once you have verified that your build of ns-3 works by running
-the simple-point-to-point example as outlined in 3) above, it is
-quite likely that you will want to get started on reading
-some ns-3 documentation. 
-
-All of that documentation should always be available from
-the ns-3 website: http:://www.nsnam.org/documentation/.
-
-This documentation includes:
-
-  - a tutorial
- 
-  - a reference manual
-
-  - models in the ns-3 model library
-
-  - a wiki for user-contributed tips: http://www.nsnam.org/wiki/
-
-  - API documentation generated using doxygen: this is
-    a reference manual, most likely not very well suited 
-    as introductory text:
-    http://www.nsnam.org/doxygen/index.html
-
-5) Working with the development version of ns-3
------------------------------------------------
-
-If you want to download and use the development version 
-of ns-3, you need to use the tool 'mercurial'. A quick and
-dirty cheat sheet is included in doc/mercurial.txt but
-reading through the mercurial tutorials included on the
-mercurial website is usually a good idea if you are not
-familiar with it.
-
-If you have successfully installed mercurial, you can get
-a copy of the development version with the following command:
-"hg clone http://code.nsnam.org/ns-3-dev"
+[2]  Wolfram Lautenschlaege Active Queue Management and packet scheduling Internet Draft
