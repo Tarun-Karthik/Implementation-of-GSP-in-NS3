@@ -84,6 +84,11 @@ TypeId GspQueueDisc::GetTypeId (void)
                    TimeValue (),
                    MakeTimeAccessor (&GspQueueDisc::m_secThreshold),
                    MakeTimeChecker ())
+    .AddAttribute("LinkBandwidth",
+                  "The GSP link bandwidth",
+                  DataRateValue(DataRate ("1.5Mbps")),
+                  MakeDataRateAccessor(&GspQueueDisc::m_linkBandwidth),        
+                  MakeDataRateChecker ())
     .AddAttribute ("Timeout",
                    "amount of time for which the packets will not be dropped",
                    TimeValue (Seconds (0)),
@@ -301,7 +306,7 @@ void GspQueueDisc::InitializeParams (void)
 {
   NS_LOG_FUNCTION (this);
 
-  //Initialize m_secThreshold using bandwidth-delay product
+  m_secThreshold = Time (Seconds(m_linkBandwidth.GetBitRate ()/m_threshold));
   m_maxTime = Time (Seconds (60));
   m_cumTime = Time (Seconds (0));
 }

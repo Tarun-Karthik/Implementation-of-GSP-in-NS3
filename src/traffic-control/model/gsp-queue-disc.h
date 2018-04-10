@@ -25,6 +25,7 @@
  #define GSP_QUEUE_DISC_H
 
  #include "ns3/queue-disc.h"
+ #include "ns3/data-rate.h"
 
 namespace ns3 {
 /**
@@ -131,6 +132,7 @@ private:
   Time m_secThreshold;
   Time m_timeout;
   GspMode m_mode;
+  DataRate m_linkBandwidth;
   
   // ** Variables maintained by GSP
   Time m_tiq;
