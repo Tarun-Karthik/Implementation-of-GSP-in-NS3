@@ -31,28 +31,6 @@
  //     / 10Gb/s
  //   n1
  */
-
- #include "ns3/core-module.h"
- #include "ns3/network-module.h"
- #include "ns3/internet-module.h"
- #include "ns3/flow-monitor-helper.h"
- #include "ns3/point-to-point-module.h"
- #include "ns3/applications-module.h"
- #include "ns3/traffic-control-module.h"
-
- using namespace ns3;
-
- NS_LOG_COMPONENT_DEFINE ("SfqExample");
-
- NodeContainer n0n1;
- NodeContainer n1n2;
- NodeContainer n1n3;
-
- Ipv4InterfaceContainer i0i1;
- Ipv4InterfaceContainer i1i2;
- Ipv4InterfaceContainer i1i3;
-
- uint16_t port = 50000;
 #include <iostream>
 #include <fstream>
 #include <string>
