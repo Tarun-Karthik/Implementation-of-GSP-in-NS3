@@ -1,5 +1,3 @@
-
-
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2018 NITK Surathkal
@@ -56,6 +54,9 @@ main (int argc, char *argv[])
   Config::SetDefault ("ns3::OnOffApplication::PacketSize", UintegerValue (210));
   Config::SetDefault ("ns3::OnOffApplication::DataRate", StringValue ("10Gb/s"));
 
+  TrafficControlHelper tchSfq;
+  tchSfq.SetRootQueueDisc ("ns3::GspQueueDisc");
+
   NS_LOG_INFO ("Create nodes.");
   NodeContainer c;
   c.Create (4);
@@ -71,10 +72,13 @@ main (int argc, char *argv[])
   p2p.SetDeviceAttribute ("DataRate", StringValue ("10Gbps"));
   p2p.SetChannelAttribute ("Delay", StringValue ("2ms"));
   NetDeviceContainer d0d2 = p2p.Install (n0n2);
+  tchSfq.Install (d0d2);
 
   NetDeviceContainer d1d2 = p2p.Install (n1n2);
+  tchSfq.Install (d1d2);
 
   NetDeviceContainer d3d2 = p2p.Install (n3n2);
+  tchSfq.Install (d3d2);
 
   NS_LOG_INFO ("Assign IP Addresses.");
   Ipv4AddressHelper ipv4;
