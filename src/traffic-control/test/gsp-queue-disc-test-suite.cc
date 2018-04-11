@@ -18,7 +18,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Authors: A Tarun Karthik <tarun.karthik.97@gmail.com>
-            Amshula U S <>
+            Amshula U S <usamshula@gmail.com>
             Manoj Kumar <mnkumar493@gmail.com>
  */
 
