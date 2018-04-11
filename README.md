@@ -22,7 +22,7 @@ presence of packets in the queue. The queue collapse may be less severe when los
 one or more flows multiple times, so that the fraction of the total population affected
 by losses is smaller than 50%, but statistically it still presents a problem.
 
-There are three varients of GSP algorithm:  basic, adaptive, and delay-based. 
+There are three variants of GSP algorithm:  basic, adaptive, and delay-based. 
 #### Basic GSP
 In this algorithm global synchronization can be averted by removing the extra 
 packet drops after the first one. A Threshold is set well below the buffer limit.
@@ -37,7 +37,7 @@ In single-drop operation the queue is most of the time below the threshold
 and drops a packet only once in many expirations of the maximum interval 
 duration. No adaptation is necessary. The interval value must be reduced 
 as soon as the queue starts spending more time above the threshold than
-below. let presetInt be the initial and maximum setting for the adaptive 
+below. Let presetInt be the initial and maximum setting for the adaptive 
 interval variable, tau the time constant for the adaptation loop, and alpha 
 the emphasis factor for the time spent above the threshold, such that the 
 reaction to load changes is stronger. As a rule of thumb, tau should be
