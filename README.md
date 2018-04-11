@@ -42,13 +42,17 @@ interval variable, tau the time constant for the adaptation loop, and alpha
 the emphasis factor for the time spent above the threshold, such that the 
 reaction to load changes is stronger. As a rule of thumb, tau should be
 comfortably larger than presetInt (we set the ratio at 5) and alpha should
-not be much larger than 1 
+not be much larger than 1.
 
-at every packet arrival DO: <br />
-cumulTime += (alpha * time_above_threshold – time_below_threshold) <br />
-cumulTime = min(maxTime, max(0, cumulTime)) <br />
-interval = presetInt / (1 + cumulTime / tau) <br />
-NEXT proceed with basic GSP algorithm <br />
+```c   
+   at every packet arrival DO:
+     cumulTime += (alpha * time_above_threshold – time_below_threshold)
+     cumulTime = min(maxTime, max(0, cumulTime)) 
+     interval = presetInt / (1 + cumulTime / tau) 
+     NEXT proceed with basic GSP algorithm 
+```
+ 
+
 
 ### Delay-Based GSP
 We enable delay-based operation in GSP by generalizing the meaning of the 
@@ -63,7 +67,7 @@ the timestamp approach.
 
 ### References
 
-[1] Wolfram Lautenschlaeger,  Andrea Francini Global Synchronization Protection for Bandwidth
-Sharing TCP Flows in High-Speed Links 
+[1] [Wolfram Lautenschlaeger,  Andrea Francini Global Synchronization Protection for Bandwidth
+Sharing TCP Flows in High-Speed Links](https://arxiv.org/abs/1602.05333) 
 
-[2]  Wolfram Lautenschlaege Active Queue Management and packet scheduling Internet Draft
+[2]  [Wolfram Lautenschlaege Active Queue Management and packet scheduling Internet Draft](https://tools.ietf.org/html/draft-lauten-aqm-gsp-03)
