@@ -34,6 +34,7 @@ def build(bld):
       'test/fifo-queue-disc-test-suite.cc',
       'test/tbf-queue-disc-test-suite.cc',
       'test/tc-flow-control-test-suite.cc'
+      'test/gsp-queue-disc-test-suite.cc'
         ]
 
     headers = bld(features='ns3header')
@@ -59,4 +60,3 @@ def build(bld):
         bld.recurse('examples')
 
     bld.ns3_python_bindings()
-
