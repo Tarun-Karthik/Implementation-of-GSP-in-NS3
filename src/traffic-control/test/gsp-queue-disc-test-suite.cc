@@ -20,15 +20,16 @@
             Manoj Kumar <mnkumar493@gmail.com>
  */
 
- /** Network topology
- //  n0
- //     \ 10Gb/s
- //      \          10Gb/s
- //       n2 -------------------------n3
- //      /
- //     / 10Gb/s
- //   n1
+ /* Network topology
+ *  n0
+ *     \ 10Gb/s
+ *      \          10Gb/s
+ *       n2 ----------------n3
+ *      /
+ *     / 10Gb/s
+ *   n1
  */
+
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -71,6 +72,7 @@ main (int argc, char *argv[])
   PointToPointHelper p2p;
   p2p.SetDeviceAttribute ("DataRate", StringValue ("10Gbps"));
   p2p.SetChannelAttribute ("Delay", StringValue ("2ms"));
+
   NetDeviceContainer d0d2 = p2p.Install (n0n2);
   tchSfq.Install (d0d2);
 
@@ -104,21 +106,18 @@ main (int argc, char *argv[])
   apps.Start (Seconds (1.0));
   apps.Stop (Seconds (10.0));
 
-  // Create a packet sink to receive these packets
   PacketSinkHelper sink ("ns3::UdpSocketFactory",
                          Address (InetSocketAddress (Ipv4Address::GetAny (), port)));
   apps = sink.Install (c.Get (3));
   apps.Start (Seconds (1.0));
   apps.Stop (Seconds (10.0));
 
-  // Create a similar flow from n3 to n1, starting at time 1.1 seconds
   onoff.SetAttribute ("Remote",
                       AddressValue (InetSocketAddress (i1i2.GetAddress (0), port)));
   apps = onoff.Install (c.Get (3));
   apps.Start (Seconds (1.1));
   apps.Stop (Seconds (10.0));
 
-  // Create a packet sink to receive these packets
   apps = sink.Install (c.Get (1));
   apps.Start (Seconds (1.1));
   apps.Stop (Seconds (10.0));
@@ -129,7 +128,6 @@ main (int argc, char *argv[])
   apps.Start (Seconds (1.1));
   apps.Stop (Seconds (10.0));
 
-  // Create a packet sink to receive these packets
   apps = sink.Install (c.Get (0));
   apps.Start (Seconds (1.1));
   apps.Stop (Seconds (10.0));
@@ -140,7 +138,6 @@ main (int argc, char *argv[])
   apps.Start (Seconds (1.1));
   apps.Stop (Seconds (10.0));
 
-  // Create a packet sink to receive these packets
   apps = sink.Install (c.Get (3));
   apps.Start (Seconds (1.1));
   apps.Stop (Seconds (10.0));
